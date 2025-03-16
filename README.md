@@ -48,6 +48,18 @@ go get github.com/TFMV/archery
 
 ### Record Operations
 
+#### Package-Level Functions (Recommended)
+
+- `FilterRecordByMask`, `FilterRecordRows`, `FilterRecordByColumn`: Filter records based on conditions
+- `FilterRecordGreaterThan`, `FilterRecordLessThan`, `FilterRecordEqual`, `FilterRecordBetween`: Filter records with common conditions
+- `SortRecordByColumn`: Sort records by a specified column
+- `AggregateRecordColumn`: Apply aggregation functions to columns
+- `SumRecordColumn`, `MeanRecordColumn`, `MinRecordColumn`, `MaxRecordColumn`: Common aggregation operations
+- `GroupByRecord`: Group records by one or more columns and apply aggregation functions
+- `GetRecordColumn`: Get a column array by name
+
+#### RecordWrapper (Alternative Approach)
+
 - `RecordWrapper`: A wrapper for Arrow Records that provides methods to apply array operations to records
 - `FilterByMask`, `FilterRows`, `FilterRowsByColumn`: Filter records based on conditions
 - `SortRecord`: Sort records by a specified column
@@ -87,7 +99,7 @@ if err != nil {
 }
 ```
 
-### Working with Records
+### Working with Records (Package-Level Functions)
 
 ```go
 // Create a record
@@ -106,6 +118,52 @@ nameArray := ... // StringArray
 scoreArray := ... // Float64Array
 
 // Create the record
+record := array.NewRecord(schema, []arrow.Array{idArray, nameArray, scoreArray}, 5)
+defer record.Release()
+
+// Memory allocator
+mem := memory.DefaultAllocator
+
+// Filter records where score > 80
+ctx := context.Background()
+filtered, err := archery.FilterRecordGreaterThan(ctx, record, "score", 80.0, mem)
+if err != nil {
+    log.Fatal(err)
+}
+defer filtered.Release()
+
+// Sort records by score in descending order
+sorted, err := archery.SortRecordByColumn(ctx, record, "score", archery.Descending, mem)
+if err != nil {
+    log.Fatal(err)
+}
+defer sorted.Release()
+
+// Calculate mean score
+mean, err := archery.MeanRecordColumn(ctx, record, "score", mem)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Mean score: %.2f\n", mean)
+
+// Group by category and calculate mean scores
+groupByResult, err := archery.GroupByRecord(ctx, record, []string{"category"}, map[string]func(context.Context, arrow.Array) (interface{}, error){
+    "score": archery.MeanAggregator(),
+}, mem)
+if err != nil {
+    log.Fatal(err)
+}
+defer groupByResult.Release()
+
+// Convert the result to a record
+groupedRecord := groupByResult.ToRecord(mem)
+defer groupedRecord.Release()
+```
+
+### Working with Records (RecordWrapper)
+
+```go
+// Create a record
 record := array.NewRecord(schema, []arrow.Array{idArray, nameArray, scoreArray}, 5)
 defer record.Release()
 
