@@ -3,9 +3,9 @@ package archery
 import (
 	"context"
 
-	"github.com/apache/arrow/go/v18/arrow"
-	"github.com/apache/arrow/go/v18/arrow/compute"
-	"github.com/apache/arrow/go/v18/arrow/scalar"
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/compute"
+	"github.com/apache/arrow-go/v18/arrow/scalar"
 )
 
 // Add performs element-wise addition of two arrays.
