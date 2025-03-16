@@ -13,7 +13,7 @@ Archery is a Go library that provides a user-friendly interface to the Apache Ar
 ## Installation
 
 ```bash
-go get github.com/apache/arrow/go/v18/arrow
+go get github.com/TFMV/archery
 ```
 
 ## Available Functions
