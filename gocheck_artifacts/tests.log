@@ -1,0 +1,46 @@
+=== RUN   Example_sum
+--- PASS: Example_sum (0.00s)
+=== RUN   Example_mean
+--- PASS: Example_mean (0.00s)
+=== RUN   Example_minMax
+--- PASS: Example_minMax (0.00s)
+=== RUN   Example_variance
+--- PASS: Example_variance (0.00s)
+=== RUN   Example_standardDeviation
+--- PASS: Example_standardDeviation (0.00s)
+=== RUN   Example_count
+--- PASS: Example_count (0.00s)
+=== RUN   Example_addScalar
+--- PASS: Example_addScalar (0.00s)
+=== RUN   Example_multiplyScalar
+--- PASS: Example_multiplyScalar (0.00s)
+=== RUN   Example_sqrt
+--- PASS: Example_sqrt (0.00s)
+=== RUN   Example_add
+--- PASS: Example_add (0.00s)
+=== RUN   Example_abs
+--- PASS: Example_abs (0.00s)
+=== RUN   Example_filter
+--- PASS: Example_filter (0.00s)
+=== RUN   Example_filterRange
+--- PASS: Example_filterRange (0.00s)
+=== RUN   Example_isIn
+--- PASS: Example_isIn (0.00s)
+=== RUN   Example_nullFiltering
+--- PASS: Example_nullFiltering (0.00s)
+=== RUN   Example_sort
+--- PASS: Example_sort (0.00s)
+=== RUN   Example_sortDescending
+--- PASS: Example_sortDescending (0.00s)
+=== RUN   Example_sortIndices
+--- PASS: Example_sortIndices (0.00s)
+=== RUN   Example_uniqueValues
+--- PASS: Example_uniqueValues (0.00s)
+=== RUN   Example_countValues
+--- PASS: Example_countValues (0.00s)
+=== RUN   Example_nthElement
+--- PASS: Example_nthElement (0.00s)
+PASS
+coverage: 17.7% of statements
+ok  	github.com/TFMV/archery	1.346s	coverage: 17.7% of statements
+	github.com/TFMV/archery/examples		coverage: 0.0% of statements

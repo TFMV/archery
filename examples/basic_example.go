@@ -50,7 +50,7 @@ func main() {
 
 	// Demonstrate sorting operations
 	fmt.Println("\n=== Sorting Operations ===")
-	if err := demonstrateSorting(ctx, numArray); err != nil {
+	if err := demonstrateSorting(ctx); err != nil {
 		fmt.Printf("Error in sorting operations: %v\n", err)
 		os.Exit(1)
 	}
@@ -225,7 +225,7 @@ func demonstrateFiltering(ctx context.Context, numArray arrow.Array) error {
 }
 
 // demonstrateSorting shows sorting operations on arrays
-func demonstrateSorting(ctx context.Context, numArray arrow.Array) error {
+func demonstrateSorting(ctx context.Context) error {
 	// Create an unsorted array
 	builder := array.NewFloat64Builder(memory.DefaultAllocator)
 	defer builder.Release()
