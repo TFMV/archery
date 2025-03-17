@@ -20,14 +20,6 @@ const (
 	Descending
 )
 
-// GetArrowSortOrder converts our SortOrder to Arrow's compute.SortOrder
-func getArrowSortOrder(order SortOrder) int {
-	if order == Descending {
-		return 1 // compute.SortOrder_Descending
-	}
-	return 0 // compute.SortOrder_Ascending
-}
-
 // ReleaseArray safely releases an array if it's not nil
 func ReleaseArray(arr arrow.Array) {
 	if arr != nil {
