@@ -2,400 +2,733 @@ package archery
 
 import (
 	"context"
+	"fmt"
 	"math"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
-	"github.com/apache/arrow-go/v18/arrow/scalar"
 )
 
-// Sum calculates the sum of all elements in an array.
-// Returns the resulting scalar and any error encountered.
-func Sum(ctx context.Context, arr arrow.Array) (scalar.Scalar, error) {
-	// Since the sum function is not available, we'll implement it manually
-	switch arr.DataType().ID() {
+// ARRAY AGGREGATION OPERATIONS
+
+// Sum returns the sum of all elements in the array
+func Sum(ctx context.Context, input arrow.Array) (interface{}, error) {
+	// Implement sum manually since the compute function is not available
+	switch input.DataType().ID() {
+	case arrow.BOOL:
+		boolArr := input.(*array.Boolean)
+		var sum int64
+		for i := 0; i < boolArr.Len(); i++ {
+			if !boolArr.IsNull(i) {
+				if boolArr.Value(i) {
+					sum++
+				}
+			}
+		}
+		return sum, nil
+	case arrow.INT8:
+		int8Arr := input.(*array.Int8)
+		var sum int64
+		for i := 0; i < int8Arr.Len(); i++ {
+			if !int8Arr.IsNull(i) {
+				sum += int64(int8Arr.Value(i))
+			}
+		}
+		return sum, nil
+	case arrow.INT16:
+		int16Arr := input.(*array.Int16)
+		var sum int64
+		for i := 0; i < int16Arr.Len(); i++ {
+			if !int16Arr.IsNull(i) {
+				sum += int64(int16Arr.Value(i))
+			}
+		}
+		return sum, nil
+	case arrow.INT32:
+		int32Arr := input.(*array.Int32)
+		var sum int64
+		for i := 0; i < int32Arr.Len(); i++ {
+			if !int32Arr.IsNull(i) {
+				sum += int64(int32Arr.Value(i))
+			}
+		}
+		return sum, nil
 	case arrow.INT64:
-		int64Arr := arr.(*array.Int64)
+		int64Arr := input.(*array.Int64)
 		var sum int64
 		for i := 0; i < int64Arr.Len(); i++ {
 			if !int64Arr.IsNull(i) {
 				sum += int64Arr.Value(i)
 			}
 		}
-		return scalar.NewInt64Scalar(sum), nil
+		return sum, nil
+	case arrow.UINT8:
+		uint8Arr := input.(*array.Uint8)
+		var sum uint64
+		for i := 0; i < uint8Arr.Len(); i++ {
+			if !uint8Arr.IsNull(i) {
+				sum += uint64(uint8Arr.Value(i))
+			}
+		}
+		return sum, nil
+	case arrow.UINT16:
+		uint16Arr := input.(*array.Uint16)
+		var sum uint64
+		for i := 0; i < uint16Arr.Len(); i++ {
+			if !uint16Arr.IsNull(i) {
+				sum += uint64(uint16Arr.Value(i))
+			}
+		}
+		return sum, nil
+	case arrow.UINT32:
+		uint32Arr := input.(*array.Uint32)
+		var sum uint64
+		for i := 0; i < uint32Arr.Len(); i++ {
+			if !uint32Arr.IsNull(i) {
+				sum += uint64(uint32Arr.Value(i))
+			}
+		}
+		return sum, nil
+	case arrow.UINT64:
+		uint64Arr := input.(*array.Uint64)
+		var sum uint64
+		for i := 0; i < uint64Arr.Len(); i++ {
+			if !uint64Arr.IsNull(i) {
+				sum += uint64Arr.Value(i)
+			}
+		}
+		return sum, nil
+	case arrow.FLOAT32:
+		float32Arr := input.(*array.Float32)
+		var sum float64
+		for i := 0; i < float32Arr.Len(); i++ {
+			if !float32Arr.IsNull(i) {
+				sum += float64(float32Arr.Value(i))
+			}
+		}
+		return sum, nil
 	case arrow.FLOAT64:
-		float64Arr := arr.(*array.Float64)
+		float64Arr := input.(*array.Float64)
 		var sum float64
 		for i := 0; i < float64Arr.Len(); i++ {
 			if !float64Arr.IsNull(i) {
 				sum += float64Arr.Value(i)
 			}
 		}
-		return scalar.NewFloat64Scalar(sum), nil
+		return sum, nil
 	default:
-		return nil, arrow.ErrNotImplemented
+		return nil, fmt.Errorf("sum not implemented for type %s", input.DataType())
 	}
 }
 
-// Mean calculates the arithmetic mean of all elements in an array.
-// Returns the resulting scalar and any error encountered.
-func Mean(ctx context.Context, arr arrow.Array) (scalar.Scalar, error) {
-	// Since the mean function is not available, we'll implement it manually
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		int64Arr := arr.(*array.Int64)
-		var sum int64
-		var count int64
-		for i := 0; i < int64Arr.Len(); i++ {
-			if !int64Arr.IsNull(i) {
-				sum += int64Arr.Value(i)
-				count++
-			}
+// Mean returns the mean of all elements in the array
+func Mean(ctx context.Context, input arrow.Array) (float64, error) {
+	// Implement mean manually
+	if input.Len() == 0 || input.Len() == input.NullN() {
+		return 0, nil
+	}
+
+	switch input.DataType().ID() {
+	case arrow.BOOL, arrow.INT8, arrow.INT16, arrow.INT32, arrow.INT64,
+		arrow.UINT8, arrow.UINT16, arrow.UINT32, arrow.UINT64,
+		arrow.FLOAT32, arrow.FLOAT64:
+
+		sum, err := Sum(ctx, input)
+		if err != nil {
+			return 0, err
 		}
-		if count == 0 {
-			return nil, arrow.ErrInvalid
+
+		count := float64(input.Len() - input.NullN())
+
+		switch v := sum.(type) {
+		case int64:
+			return float64(v) / count, nil
+		case uint64:
+			return float64(v) / count, nil
+		case float64:
+			return v / count, nil
+		default:
+			return 0, fmt.Errorf("unexpected sum type: %T", sum)
 		}
-		return scalar.NewFloat64Scalar(float64(sum) / float64(count)), nil
-	case arrow.FLOAT64:
-		float64Arr := arr.(*array.Float64)
-		var sum float64
-		var count int64
-		for i := 0; i < float64Arr.Len(); i++ {
-			if !float64Arr.IsNull(i) {
-				sum += float64Arr.Value(i)
-				count++
-			}
-		}
-		if count == 0 {
-			return nil, arrow.ErrInvalid
-		}
-		return scalar.NewFloat64Scalar(sum / float64(count)), nil
 	default:
-		return nil, arrow.ErrNotImplemented
+		return 0, fmt.Errorf("mean not implemented for type %s", input.DataType())
 	}
 }
 
-// Min finds the minimum value in an array.
-// Returns the resulting scalar and any error encountered.
-func Min(ctx context.Context, arr arrow.Array) (scalar.Scalar, error) {
-	// Since the min function is not available, we'll implement it manually
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		int64Arr := arr.(*array.Int64)
-		if int64Arr.Len() == 0 {
-			return nil, arrow.ErrInvalid
+// Min returns the minimum value in the array
+func Min(ctx context.Context, input arrow.Array) (interface{}, error) {
+	// Implement min manually
+	if input.Len() == 0 || input.Len() == input.NullN() {
+		return nil, nil
+	}
+
+	switch input.DataType().ID() {
+	case arrow.BOOL:
+		boolArr := input.(*array.Boolean)
+		// Find first non-null value
+		var min bool
+		found := false
+		for i := 0; i < boolArr.Len(); i++ {
+			if !boolArr.IsNull(i) {
+				min = boolArr.Value(i)
+				found = true
+				break
+			}
 		}
+		if !found {
+			return nil, nil
+		}
+		// If we found a false, that's the minimum
+		if !min {
+			return false, nil
+		}
+		// Otherwise, check if there are any false values
+		for i := 0; i < boolArr.Len(); i++ {
+			if !boolArr.IsNull(i) && !boolArr.Value(i) {
+				return false, nil
+			}
+		}
+		return true, nil
+	case arrow.INT8:
+		int8Arr := input.(*array.Int8)
+		// Find first non-null value
+		var min int8
+		found := false
+		for i := 0; i < int8Arr.Len(); i++ {
+			if !int8Arr.IsNull(i) {
+				min = int8Arr.Value(i)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil
+		}
+		// Find minimum
+		for i := 0; i < int8Arr.Len(); i++ {
+			if !int8Arr.IsNull(i) && int8Arr.Value(i) < min {
+				min = int8Arr.Value(i)
+			}
+		}
+		return min, nil
+	case arrow.INT16:
+		int16Arr := input.(*array.Int16)
+		// Find first non-null value
+		var min int16
+		found := false
+		for i := 0; i < int16Arr.Len(); i++ {
+			if !int16Arr.IsNull(i) {
+				min = int16Arr.Value(i)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil
+		}
+		// Find minimum
+		for i := 0; i < int16Arr.Len(); i++ {
+			if !int16Arr.IsNull(i) && int16Arr.Value(i) < min {
+				min = int16Arr.Value(i)
+			}
+		}
+		return min, nil
+	case arrow.INT32:
+		int32Arr := input.(*array.Int32)
+		// Find first non-null value
+		var min int32
+		found := false
+		for i := 0; i < int32Arr.Len(); i++ {
+			if !int32Arr.IsNull(i) {
+				min = int32Arr.Value(i)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil
+		}
+		// Find minimum
+		for i := 0; i < int32Arr.Len(); i++ {
+			if !int32Arr.IsNull(i) && int32Arr.Value(i) < min {
+				min = int32Arr.Value(i)
+			}
+		}
+		return min, nil
+	case arrow.INT64:
+		int64Arr := input.(*array.Int64)
+		// Find first non-null value
 		var min int64
-		var found bool
+		found := false
 		for i := 0; i < int64Arr.Len(); i++ {
 			if !int64Arr.IsNull(i) {
-				if !found {
-					min = int64Arr.Value(i)
-					found = true
-				} else if int64Arr.Value(i) < min {
-					min = int64Arr.Value(i)
-				}
+				min = int64Arr.Value(i)
+				found = true
+				break
 			}
 		}
 		if !found {
-			return nil, arrow.ErrInvalid
+			return nil, nil
 		}
-		return scalar.NewInt64Scalar(min), nil
+		// Find minimum
+		for i := 0; i < int64Arr.Len(); i++ {
+			if !int64Arr.IsNull(i) && int64Arr.Value(i) < min {
+				min = int64Arr.Value(i)
+			}
+		}
+		return min, nil
 	case arrow.FLOAT64:
-		float64Arr := arr.(*array.Float64)
-		if float64Arr.Len() == 0 {
-			return nil, arrow.ErrInvalid
-		}
+		float64Arr := input.(*array.Float64)
+		// Find first non-null value
 		var min float64
-		var found bool
+		found := false
 		for i := 0; i < float64Arr.Len(); i++ {
 			if !float64Arr.IsNull(i) {
-				if !found {
-					min = float64Arr.Value(i)
-					found = true
-				} else if float64Arr.Value(i) < min {
-					min = float64Arr.Value(i)
-				}
+				min = float64Arr.Value(i)
+				found = true
+				break
 			}
 		}
 		if !found {
-			return nil, arrow.ErrInvalid
+			return nil, nil
 		}
-		return scalar.NewFloat64Scalar(min), nil
+		// Find minimum
+		for i := 0; i < float64Arr.Len(); i++ {
+			if !float64Arr.IsNull(i) && float64Arr.Value(i) < min {
+				min = float64Arr.Value(i)
+			}
+		}
+		return min, nil
 	default:
-		return nil, arrow.ErrNotImplemented
+		return nil, fmt.Errorf("min not implemented for type %s", input.DataType())
 	}
 }
 
-// Max finds the maximum value in an array.
-// Returns the resulting scalar and any error encountered.
-func Max(ctx context.Context, arr arrow.Array) (scalar.Scalar, error) {
-	// Since the max function is not available, we'll implement it manually
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		int64Arr := arr.(*array.Int64)
-		if int64Arr.Len() == 0 {
-			return nil, arrow.ErrInvalid
+// Max returns the maximum value in the array
+func Max(ctx context.Context, input arrow.Array) (interface{}, error) {
+	// Implement max manually
+	if input.Len() == 0 || input.Len() == input.NullN() {
+		return nil, nil
+	}
+
+	switch input.DataType().ID() {
+	case arrow.BOOL:
+		boolArr := input.(*array.Boolean)
+		// Find first non-null value
+		var max bool
+		found := false
+		for i := 0; i < boolArr.Len(); i++ {
+			if !boolArr.IsNull(i) {
+				max = boolArr.Value(i)
+				found = true
+				break
+			}
 		}
+		if !found {
+			return nil, nil
+		}
+		// If we found a true, that's the maximum
+		if max {
+			return true, nil
+		}
+		// Otherwise, check if there are any true values
+		for i := 0; i < boolArr.Len(); i++ {
+			if !boolArr.IsNull(i) && boolArr.Value(i) {
+				return true, nil
+			}
+		}
+		return false, nil
+	case arrow.INT8:
+		int8Arr := input.(*array.Int8)
+		// Find first non-null value
+		var max int8
+		found := false
+		for i := 0; i < int8Arr.Len(); i++ {
+			if !int8Arr.IsNull(i) {
+				max = int8Arr.Value(i)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil
+		}
+		// Find maximum
+		for i := 0; i < int8Arr.Len(); i++ {
+			if !int8Arr.IsNull(i) && int8Arr.Value(i) > max {
+				max = int8Arr.Value(i)
+			}
+		}
+		return max, nil
+	case arrow.INT16:
+		int16Arr := input.(*array.Int16)
+		// Find first non-null value
+		var max int16
+		found := false
+		for i := 0; i < int16Arr.Len(); i++ {
+			if !int16Arr.IsNull(i) {
+				max = int16Arr.Value(i)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil
+		}
+		// Find maximum
+		for i := 0; i < int16Arr.Len(); i++ {
+			if !int16Arr.IsNull(i) && int16Arr.Value(i) > max {
+				max = int16Arr.Value(i)
+			}
+		}
+		return max, nil
+	case arrow.INT32:
+		int32Arr := input.(*array.Int32)
+		// Find first non-null value
+		var max int32
+		found := false
+		for i := 0; i < int32Arr.Len(); i++ {
+			if !int32Arr.IsNull(i) {
+				max = int32Arr.Value(i)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil
+		}
+		// Find maximum
+		for i := 0; i < int32Arr.Len(); i++ {
+			if !int32Arr.IsNull(i) && int32Arr.Value(i) > max {
+				max = int32Arr.Value(i)
+			}
+		}
+		return max, nil
+	case arrow.INT64:
+		int64Arr := input.(*array.Int64)
+		// Find first non-null value
 		var max int64
-		var found bool
+		found := false
 		for i := 0; i < int64Arr.Len(); i++ {
 			if !int64Arr.IsNull(i) {
-				if !found {
-					max = int64Arr.Value(i)
-					found = true
-				} else if int64Arr.Value(i) > max {
-					max = int64Arr.Value(i)
-				}
+				max = int64Arr.Value(i)
+				found = true
+				break
 			}
 		}
 		if !found {
-			return nil, arrow.ErrInvalid
+			return nil, nil
 		}
-		return scalar.NewInt64Scalar(max), nil
+		// Find maximum
+		for i := 0; i < int64Arr.Len(); i++ {
+			if !int64Arr.IsNull(i) && int64Arr.Value(i) > max {
+				max = int64Arr.Value(i)
+			}
+		}
+		return max, nil
 	case arrow.FLOAT64:
-		float64Arr := arr.(*array.Float64)
-		if float64Arr.Len() == 0 {
-			return nil, arrow.ErrInvalid
-		}
+		float64Arr := input.(*array.Float64)
+		// Find first non-null value
 		var max float64
-		var found bool
+		found := false
 		for i := 0; i < float64Arr.Len(); i++ {
 			if !float64Arr.IsNull(i) {
-				if !found {
-					max = float64Arr.Value(i)
-					found = true
-				} else if float64Arr.Value(i) > max {
-					max = float64Arr.Value(i)
-				}
+				max = float64Arr.Value(i)
+				found = true
+				break
 			}
 		}
 		if !found {
-			return nil, arrow.ErrInvalid
+			return nil, nil
 		}
-		return scalar.NewFloat64Scalar(max), nil
+		// Find maximum
+		for i := 0; i < float64Arr.Len(); i++ {
+			if !float64Arr.IsNull(i) && float64Arr.Value(i) > max {
+				max = float64Arr.Value(i)
+			}
+		}
+		return max, nil
 	default:
-		return nil, arrow.ErrNotImplemented
+		return nil, fmt.Errorf("max not implemented for type %s", input.DataType())
 	}
 }
 
-// MinMaxResult contains the min and max scalars.
-type MinMaxResult struct {
-	Min scalar.Scalar
-	Max scalar.Scalar
-}
-
-// MinMax finds both the minimum and maximum values in an array.
-// Returns a struct containing the min and max scalars, and any error encountered.
-func MinMax(ctx context.Context, arr arrow.Array) (*MinMaxResult, error) {
-	// Since the min_max function is not available, we'll implement it manually
-	min, err := Min(ctx, arr)
-	if err != nil {
-		return nil, err
+// Mode returns the most common value in the array
+func Mode(ctx context.Context, input arrow.Array) (interface{}, error) {
+	// Implement mode manually
+	if input.Len() == 0 || input.Len() == input.NullN() {
+		return nil, nil
 	}
 
-	max, err := Max(ctx, arr)
-	if err != nil {
-		return nil, err
-	}
-
-	return &MinMaxResult{
-		Min: min,
-		Max: max,
-	}, nil
-}
-
-// Count counts the number of elements in an array.
-// Returns the count as an int64 and any error encountered.
-func Count(ctx context.Context, arr arrow.Array) (int64, error) {
-	// Since the count function is not available, we'll implement it manually
-	return int64(arr.Len()), nil
-}
-
-// CountNonNull counts the number of non-null elements in an array.
-// Returns the count as an int64 and any error encountered.
-func CountNonNull(ctx context.Context, arr arrow.Array) (int64, error) {
-	// Since the count_non_null function is not available, we'll implement it manually
-	return int64(arr.Len() - arr.NullN()), nil
-}
-
-// Variance calculates the variance of the elements in an array.
-// Returns the variance as a float64 and any error encountered.
-func Variance(ctx context.Context, arr arrow.Array) (float64, error) {
-	// Since the variance function is not available, we'll implement it manually
-	switch arr.DataType().ID() {
+	// For simplicity, we'll implement mode for a few common types
+	switch input.DataType().ID() {
+	case arrow.BOOL:
+		boolArr := input.(*array.Boolean)
+		trueCount := 0
+		falseCount := 0
+		for i := 0; i < boolArr.Len(); i++ {
+			if !boolArr.IsNull(i) {
+				if boolArr.Value(i) {
+					trueCount++
+				} else {
+					falseCount++
+				}
+			}
+		}
+		if trueCount > falseCount {
+			return true, nil
+		}
+		return false, nil
 	case arrow.INT64:
-		int64Arr := arr.(*array.Int64)
-		var sum int64
-		var sumSquares int64
-		var count int64
+		int64Arr := input.(*array.Int64)
+		counts := make(map[int64]int)
 		for i := 0; i < int64Arr.Len(); i++ {
 			if !int64Arr.IsNull(i) {
-				val := int64Arr.Value(i)
-				sum += val
-				sumSquares += val * val
-				count++
+				counts[int64Arr.Value(i)]++
 			}
 		}
-		if count <= 1 {
-			return 0, arrow.ErrInvalid
+		var mode int64
+		maxCount := 0
+		for val, count := range counts {
+			if count > maxCount {
+				maxCount = count
+				mode = val
+			}
 		}
-		mean := float64(sum) / float64(count)
-		return float64(sumSquares)/float64(count) - mean*mean, nil
+		return mode, nil
 	case arrow.FLOAT64:
-		float64Arr := arr.(*array.Float64)
-		var sum float64
-		var sumSquares float64
-		var count int64
+		float64Arr := input.(*array.Float64)
+		counts := make(map[float64]int)
 		for i := 0; i < float64Arr.Len(); i++ {
 			if !float64Arr.IsNull(i) {
-				val := float64Arr.Value(i)
-				sum += val
-				sumSquares += val * val
-				count++
+				counts[float64Arr.Value(i)]++
 			}
 		}
-		if count <= 1 {
-			return 0, arrow.ErrInvalid
+		var mode float64
+		maxCount := 0
+		for val, count := range counts {
+			if count > maxCount {
+				maxCount = count
+				mode = val
+			}
 		}
-		mean := sum / float64(count)
-		return sumSquares/float64(count) - mean*mean, nil
+		return mode, nil
 	default:
-		return 0, arrow.ErrNotImplemented
+		return nil, fmt.Errorf("mode not implemented for type %s", input.DataType())
 	}
 }
 
-// StandardDeviation calculates the standard deviation of the elements in an array.
-// Returns the standard deviation as a float64 and any error encountered.
-func StandardDeviation(ctx context.Context, arr arrow.Array) (float64, error) {
-	// Since the stddev function is not available, we'll implement it manually
-	variance, err := Variance(ctx, arr)
+// Variance returns the variance of the array
+func Variance(ctx context.Context, input arrow.Array) (float64, error) {
+	// Implement variance manually
+	if input.Len() == 0 || input.Len() == input.NullN() {
+		return 0, nil
+	}
+
+	// Calculate mean first
+	mean, err := Mean(ctx, input)
 	if err != nil {
 		return 0, err
 	}
+
+	var sumSquaredDiff float64
+	var count float64
+
+	switch input.DataType().ID() {
+	case arrow.INT8:
+		int8Arr := input.(*array.Int8)
+		for i := 0; i < int8Arr.Len(); i++ {
+			if !int8Arr.IsNull(i) {
+				diff := float64(int8Arr.Value(i)) - mean
+				sumSquaredDiff += diff * diff
+				count++
+			}
+		}
+	case arrow.INT16:
+		int16Arr := input.(*array.Int16)
+		for i := 0; i < int16Arr.Len(); i++ {
+			if !int16Arr.IsNull(i) {
+				diff := float64(int16Arr.Value(i)) - mean
+				sumSquaredDiff += diff * diff
+				count++
+			}
+		}
+	case arrow.INT32:
+		int32Arr := input.(*array.Int32)
+		for i := 0; i < int32Arr.Len(); i++ {
+			if !int32Arr.IsNull(i) {
+				diff := float64(int32Arr.Value(i)) - mean
+				sumSquaredDiff += diff * diff
+				count++
+			}
+		}
+	case arrow.INT64:
+		int64Arr := input.(*array.Int64)
+		for i := 0; i < int64Arr.Len(); i++ {
+			if !int64Arr.IsNull(i) {
+				diff := float64(int64Arr.Value(i)) - mean
+				sumSquaredDiff += diff * diff
+				count++
+			}
+		}
+	case arrow.FLOAT32:
+		float32Arr := input.(*array.Float32)
+		for i := 0; i < float32Arr.Len(); i++ {
+			if !float32Arr.IsNull(i) {
+				diff := float64(float32Arr.Value(i)) - mean
+				sumSquaredDiff += diff * diff
+				count++
+			}
+		}
+	case arrow.FLOAT64:
+		float64Arr := input.(*array.Float64)
+		for i := 0; i < float64Arr.Len(); i++ {
+			if !float64Arr.IsNull(i) {
+				diff := float64Arr.Value(i) - mean
+				sumSquaredDiff += diff * diff
+				count++
+			}
+		}
+	default:
+		return 0, fmt.Errorf("variance not implemented for type %s", input.DataType())
+	}
+
+	if count <= 1 {
+		return 0, nil
+	}
+
+	// Use population variance (divide by count)
+	return sumSquaredDiff / count, nil
+}
+
+// StandardDeviation returns the standard deviation of the array
+func StandardDeviation(ctx context.Context, input arrow.Array) (float64, error) {
+	// Calculate variance first
+	variance, err := Variance(ctx, input)
+	if err != nil {
+		return 0, err
+	}
+
+	// Take square root of variance
 	return math.Sqrt(variance), nil
 }
 
-// QuantileOpts implements compute.FunctionOptions for the quantile function
-type QuantileOpts struct {
-	Interpolation string
-	Quantiles     []float64
+// Count returns the number of non-null elements in the array
+func Count(ctx context.Context, input arrow.Array) (int64, error) {
+	// This is simply the length minus the null count
+	return int64(input.Len() - input.NullN()), nil
 }
 
-// TypeName implements the compute.FunctionOptions interface
-func (o *QuantileOpts) TypeName() string {
-	return "quantile"
+// CountNull returns the number of null elements in the array
+func CountNull(ctx context.Context, input arrow.Array) int64 {
+	return int64(input.NullN())
 }
 
-// Quantile calculates the quantile of the elements in an array.
-// The quantile parameter should be between 0 and 1.
-// Returns the quantile value and any error encountered.
-func Quantile(ctx context.Context, arr arrow.Array, q float64) (scalar.Scalar, error) {
-	// Since the quantile function is not available, we'll implement it manually
-	if q < 0 || q > 1 {
-		return nil, arrow.ErrInvalid
+// Any returns true if any element in the boolean array is true
+func Any(ctx context.Context, input arrow.Array) (bool, error) {
+	if input.DataType().ID() != arrow.BOOL {
+		return false, fmt.Errorf("any operation only supported on boolean arrays")
 	}
 
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		int64Arr := arr.(*array.Int64)
-		if int64Arr.Len() == 0 {
-			return nil, arrow.ErrInvalid
+	boolArr := input.(*array.Boolean)
+	for i := 0; i < boolArr.Len(); i++ {
+		if !boolArr.IsNull(i) && boolArr.Value(i) {
+			return true, nil
 		}
-
-		// Extract non-null values
-		var values []int64
-		for i := 0; i < int64Arr.Len(); i++ {
-			if !int64Arr.IsNull(i) {
-				values = append(values, int64Arr.Value(i))
-			}
-		}
-		if len(values) == 0 {
-			return nil, arrow.ErrInvalid
-		}
-
-		// Sort the values
-		sort := func(values []int64) {
-			for i := 0; i < len(values); i++ {
-				for j := i + 1; j < len(values); j++ {
-					if values[i] > values[j] {
-						values[i], values[j] = values[j], values[i]
-					}
-				}
-			}
-		}
-		sort(values)
-
-		// Calculate the index
-		index := q * float64(len(values)-1)
-		if index == float64(int(index)) {
-			// Exact index
-			return scalar.NewInt64Scalar(values[int(index)]), nil
-		}
-
-		// Interpolate
-		lower := int(math.Floor(index))
-		upper := int(math.Ceil(index))
-		fraction := index - float64(lower)
-
-		lowerVal := values[lower]
-		upperVal := values[upper]
-
-		interpolated := float64(lowerVal) + fraction*float64(upperVal-lowerVal)
-		return scalar.NewFloat64Scalar(interpolated), nil
-	case arrow.FLOAT64:
-		float64Arr := arr.(*array.Float64)
-		if float64Arr.Len() == 0 {
-			return nil, arrow.ErrInvalid
-		}
-
-		// Extract non-null values
-		var values []float64
-		for i := 0; i < float64Arr.Len(); i++ {
-			if !float64Arr.IsNull(i) {
-				values = append(values, float64Arr.Value(i))
-			}
-		}
-		if len(values) == 0 {
-			return nil, arrow.ErrInvalid
-		}
-
-		// Sort the values
-		sort := func(values []float64) {
-			for i := 0; i < len(values); i++ {
-				for j := i + 1; j < len(values); j++ {
-					if values[i] > values[j] {
-						values[i], values[j] = values[j], values[i]
-					}
-				}
-			}
-		}
-		sort(values)
-
-		// Calculate the index
-		index := q * float64(len(values)-1)
-		if index == float64(int(index)) {
-			// Exact index
-			return scalar.NewFloat64Scalar(values[int(index)]), nil
-		}
-
-		// Interpolate
-		lower := int(math.Floor(index))
-		upper := int(math.Ceil(index))
-		fraction := index - float64(lower)
-
-		lowerVal := values[lower]
-		upperVal := values[upper]
-
-		interpolated := lowerVal + fraction*(upperVal-lowerVal)
-		return scalar.NewFloat64Scalar(interpolated), nil
-	default:
-		return nil, arrow.ErrNotImplemented
 	}
+	return false, nil
 }
 
-// Median calculates the median of the elements in an array.
-// Returns the median value and any error encountered.
-func Median(ctx context.Context, arr arrow.Array) (scalar.Scalar, error) {
-	return Quantile(ctx, arr, 0.5)
+// All returns true if all elements in the boolean array are true
+func All(ctx context.Context, input arrow.Array) (bool, error) {
+	if input.DataType().ID() != arrow.BOOL {
+		return false, fmt.Errorf("all operation only supported on boolean arrays")
+	}
+
+	boolArr := input.(*array.Boolean)
+	for i := 0; i < boolArr.Len(); i++ {
+		if !boolArr.IsNull(i) && !boolArr.Value(i) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// RECORD OPERATIONS
+
+// SumColumn returns the sum of a column in a record batch
+func SumColumn(ctx context.Context, rec arrow.Record, colName string) (interface{}, error) {
+	col, err := GetColumn(rec, colName)
+	if err != nil {
+		return nil, err
+	}
+	defer ReleaseArray(col)
+
+	return Sum(ctx, col)
+}
+
+// MeanColumn returns the mean of a column in a record batch
+func MeanColumn(ctx context.Context, rec arrow.Record, colName string) (float64, error) {
+	col, err := GetColumn(rec, colName)
+	if err != nil {
+		return 0, err
+	}
+	defer ReleaseArray(col)
+
+	return Mean(ctx, col)
+}
+
+// MinColumn returns the minimum value in a column
+func MinColumn(ctx context.Context, rec arrow.Record, colName string) (interface{}, error) {
+	col, err := GetColumn(rec, colName)
+	if err != nil {
+		return nil, err
+	}
+	defer ReleaseArray(col)
+
+	return Min(ctx, col)
+}
+
+// MaxColumn returns the maximum value in a column
+func MaxColumn(ctx context.Context, rec arrow.Record, colName string) (interface{}, error) {
+	col, err := GetColumn(rec, colName)
+	if err != nil {
+		return nil, err
+	}
+	defer ReleaseArray(col)
+
+	return Max(ctx, col)
+}
+
+// VarianceColumn returns the variance of a column
+func VarianceColumn(ctx context.Context, rec arrow.Record, colName string) (float64, error) {
+	col, err := GetColumn(rec, colName)
+	if err != nil {
+		return 0, err
+	}
+	defer ReleaseArray(col)
+
+	return Variance(ctx, col)
+}
+
+// StandardDeviationColumn returns the standard deviation of a column
+func StandardDeviationColumn(ctx context.Context, rec arrow.Record, colName string) (float64, error) {
+	col, err := GetColumn(rec, colName)
+	if err != nil {
+		return 0, err
+	}
+	defer ReleaseArray(col)
+
+	return StandardDeviation(ctx, col)
+}
+
+// CountColumn returns the number of non-null elements in a column
+func CountColumn(ctx context.Context, rec arrow.Record, colName string) (int64, error) {
+	col, err := GetColumn(rec, colName)
+	if err != nil {
+		return 0, err
+	}
+	defer ReleaseArray(col)
+
+	return Count(ctx, col)
 }

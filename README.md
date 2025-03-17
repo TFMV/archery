@@ -1,15 +1,18 @@
-# Archery: Apache Arrow Compute Library for Go
+# Archery: A Go Library for Apache Arrow Compute Operations
 
-Archery is a Go library that provides a user-friendly interface to the Apache Arrow compute package. It simplifies working with Arrow arrays and compute operations by providing a set of helper functions for common tasks.
+Archery provides an API for working with Apache Arrow compute operations in Go.
+It simplifies common tasks by providing direct functions that operate on Arrow arrays and records.
 
 ## Features
 
-- **Arithmetic Operations**: Add, subtract, multiply, divide, and more operations on Arrow arrays.
-- **Filtering Operations**: Filter arrays based on various conditions like greater than, less than, equal to, etc.
-- **Aggregation Operations**: Calculate sum, mean, min, max, standard deviation, and other statistics on Arrow arrays.
-- **Sorting Operations**: Sort arrays, get sort indices, find nth elements, and calculate ranks.
-- **Comparison Operations**: Compare arrays for equality, inequality, greater than, less than, etc.
-- **Record Operations**: Apply array operations to Arrow Records, including filtering, sorting, aggregation, and grouping.
+- **Functional Design**: Simple, idiomatic Go functions that work directly with Arrow arrays and records.
+- **Full Type Support**: Works with all standard Arrow data types.
+- **Memory Management**: Careful handling of Arrow memory to prevent leaks.
+- **Comprehensive Operations**:
+  - Arithmetic functions (add, subtract, multiply, divide, etc.)
+  - Filtering and comparison operations
+  - Aggregation functions (sum, mean, min, max, etc.)
+  - Sorting operations
 
 ## Installation
 
@@ -17,194 +20,285 @@ Archery is a Go library that provides a user-friendly interface to the Apache Ar
 go get github.com/TFMV/archery
 ```
 
+Requires Go 1.19+ and Apache Arrow Go v18+.
+
+## Usage
+
+### Basic Array Operations
+
+```go
+import (
+    "context"
+    "fmt"
+    
+    "github.com/TFMV/archery"
+    "github.com/apache/arrow-go/v18/arrow/array"
+    "github.com/apache/arrow-go/v18/arrow/memory"
+)
+
+func main() {
+    // Create a new array
+    builder := array.NewFloat64Builder(memory.DefaultAllocator)
+    defer builder.Release()
+    
+    builder.AppendValues([]float64{1.0, 2.0, 3.0, 4.0, 5.0}, nil)
+    arr := builder.NewFloat64Array()
+    defer arr.Release()
+    
+    ctx := context.Background()
+    
+    // Add 10 to each element
+    result, err := archery.AddScalar(ctx, arr, 10.0)
+    if err != nil {
+        panic(err)
+    }
+    defer archery.ReleaseArray(result)
+    
+    // Display the result
+    for i := 0; i < result.Len(); i++ {
+        fmt.Println(result.(*array.Float64).Value(i))  // 11.0, 12.0, 13.0, 14.0, 15.0
+    }
+}
+```
+
+### Working with Records
+
+```go
+import (
+    "context"
+    "fmt"
+    
+    "github.com/TFMV/archery"
+    "github.com/apache/arrow-go/v18/arrow"
+    "github.com/apache/arrow-go/v18/arrow/array"
+    "github.com/apache/arrow-go/v18/arrow/memory"
+)
+
+func main() {
+    // Create sample data
+    builder := array.NewFloat64Builder(memory.DefaultAllocator)
+    defer builder.Release()
+    
+    builder.AppendValues([]float64{1.0, 2.0, 3.0, 4.0, 5.0}, nil)
+    values := builder.NewFloat64Array()
+    defer values.Release()
+    
+    // Create another column
+    builder.Reset()
+    builder.AppendValues([]float64{10.0, 20.0, 30.0, 40.0, 50.0}, nil)
+    moreValues := builder.NewFloat64Array()
+    defer moreValues.Release()
+    
+    // Create a schema
+    fields := []arrow.Field{
+        {Name: "values", Type: arrow.PrimitiveTypes.Float64},
+        {Name: "more_values", Type: arrow.PrimitiveTypes.Float64},
+    }
+    schema := arrow.NewSchema(fields, nil)
+    
+    // Create the record
+    columns := []arrow.Array{values, moreValues}
+    record := array.NewRecord(schema, columns, int64(values.Len()))
+    defer archery.ReleaseRecord(record)
+    
+    ctx := context.Background()
+    
+    // Calculate sum of a column
+    sum, err := archery.SumColumn(ctx, record, "values")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("Sum of values: %v\n", sum)  // 15.0
+    
+    // Get a column by name
+    col, err := archery.GetColumn(record, "values")
+    if err != nil {
+        panic(err)
+    }
+    defer col.Release()
+    
+    // Filter rows where values > 2
+    mask, err := archery.GreaterScalar(ctx, col, 2.0)
+    if err != nil {
+        panic(err)
+    }
+    defer archery.ReleaseArray(mask)
+    
+    filtered, err := archery.FilterRecord(ctx, record, mask)
+    if err != nil {
+        panic(err)
+    }
+    defer archery.ReleaseRecord(filtered)
+    
+    fmt.Printf("Filtered record has %d rows\n", filtered.NumRows())  // 3
+}
+```
+
+### Filtering and Null Handling
+
+```go
+import (
+    "context"
+    "fmt"
+    
+    "github.com/TFMV/archery"
+    "github.com/apache/arrow-go/v18/arrow/array"
+    "github.com/apache/arrow-go/v18/arrow/memory"
+)
+
+func main() {
+    // Create a test array with nulls
+    builder := array.NewInt64Builder(memory.DefaultAllocator)
+    defer builder.Release()
+    
+    // Add values with some nulls
+    builder.AppendValues([]int64{1, 2, 3}, []bool{true, false, true})
+    builder.AppendNull()
+    builder.AppendValues([]int64{5, 6}, []bool{true, true})
+    
+    arr := builder.NewInt64Array()
+    defer arr.Release()
+    
+    // Create a mask for non-null values
+    maskBuilder := array.NewBooleanBuilder(memory.DefaultAllocator)
+    defer maskBuilder.Release()
+    
+    for i := 0; i < arr.Len(); i++ {
+        maskBuilder.Append(!arr.IsNull(i))
+    }
+    
+    mask := maskBuilder.NewBooleanArray()
+    defer mask.Release()
+    
+    // Apply the mask to drop nulls
+    ctx := context.Background()
+    nonNullArr, err := archery.Filter(ctx, arr, mask)
+    if err != nil {
+        panic(err)
+    }
+    defer archery.ReleaseArray(nonNullArr)
+    
+    // Print the non-null values
+    fmt.Println("Non-null values:")
+    for i := 0; i < nonNullArr.Len(); i++ {
+        fmt.Printf("%d ", nonNullArr.(*array.Int64).Value(i))
+    }
+    // Output: 1 3 5 6
+    
+    // Count nulls
+    nullCount := archery.CountNull(ctx, arr)
+    fmt.Printf("Null count: %d\n", nullCount)
+    // Output: 2
+}
+```
+
 ## Available Functions
 
-### Arithmetic Functions
+### Arithmetic Operations
 
-- `add`, `subtract`, `multiply`, `divide`
-- `power`, `sqrt`, `sign`, `negate`, `abs`
+- `Add(ctx, a, b arrow.Array) (arrow.Array, error)`
+- `Subtract(ctx, a, b arrow.Array) (arrow.Array, error)`
+- `Multiply(ctx, a, b arrow.Array) (arrow.Array, error)`
+- `Divide(ctx, a, b arrow.Array) (arrow.Array, error)`
+- `Power(ctx, a, b arrow.Array) (arrow.Array, error)`
+- `AddScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `SubtractScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `MultiplyScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `DivideScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `PowerScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `Abs(ctx, arr arrow.Array) (arrow.Array, error)`
+- `Negate(ctx, arr arrow.Array) (arrow.Array, error)`
+- `Sqrt(ctx, arr arrow.Array) (arrow.Array, error)`
+- `Sign(ctx, arr arrow.Array) (arrow.Array, error)`
 
-### Filtering Functions
+### Aggregation Operations
 
-- `FilterByMask`, `FilterGreaterThan`, `FilterLessThan`
-- `FilterEqual`, `FilterNotEqual`, `FilterBetween`
-- `FilterIsMultipleOf`, `FilterIn`, `FilterNotNull`
+- `Sum(ctx, arr arrow.Array) (interface{}, error)`
+- `Mean(ctx, arr arrow.Array) (float64, error)`
+- `Min(ctx, arr arrow.Array) (interface{}, error)`
+- `Max(ctx, arr arrow.Array) (interface{}, error)`
+- `Variance(ctx, arr arrow.Array) (float64, error)`
+- `StandardDeviation(ctx, arr arrow.Array) (float64, error)`
+- `Count(ctx, arr arrow.Array) (int64, error)`
+- `CountNull(ctx, arr arrow.Array) int64`
+- `Mode(ctx, arr arrow.Array) (interface{}, error)`
+- `Any(ctx, arr arrow.Array) (bool, error)` - For boolean arrays
+- `All(ctx, arr arrow.Array) (bool, error)` - For boolean arrays
 
-### Aggregation Functions
+### Filtering and Comparison Operations
 
-- `Sum`, `Mean`, `Min`, `Max`, `MinMax`
-- `Count`, `CountNonNull`, `Variance`, `StandardDeviation`
-- `Quantile`, `Median`
+- `Filter(ctx, input arrow.Array, mask arrow.Array) (arrow.Array, error)`
+- `IsNull(ctx, arr arrow.Array) (arrow.Array, error)` - Returns boolean mask
+- `IsValid(ctx, arr arrow.Array) (arrow.Array, error)` - Returns boolean mask
+- `Equal(ctx, a, b arrow.Array) (arrow.Array, error)` - Returns boolean mask
+- `NotEqual(ctx, a, b arrow.Array) (arrow.Array, error)` - Returns boolean mask
+- `Greater(ctx, a, b arrow.Array) (arrow.Array, error)` - Returns boolean mask
+- `GreaterEqual(ctx, a, b arrow.Array) (arrow.Array, error)` - Returns boolean mask
+- `Less(ctx, a, b arrow.Array) (arrow.Array, error)` - Returns boolean mask
+- `LessEqual(ctx, a, b arrow.Array) (arrow.Array, error)` - Returns boolean mask
+- `And(ctx, a, b arrow.Array) (arrow.Array, error)` - Boolean AND
+- `Or(ctx, a, b arrow.Array) (arrow.Array, error)` - Boolean OR
+- `Xor(ctx, a, b arrow.Array) (arrow.Array, error)` - Boolean XOR
+- `EqualScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `NotEqualScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `GreaterScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `GreaterEqualScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `LessScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
+- `LessEqualScalar(ctx, arr arrow.Array, value interface{}) (arrow.Array, error)`
 
-### Sorting Functions
+### Sorting Operations
 
-- `Sort`, `SortIndicesWithOrder`, `TakeWithIndices`
-- `NthElement`, `Rank`, `UniqueValues`
-
-### Comparison Functions
-
-- `equal`, `not_equal`, `greater`, `less`
-- `greater_equal`, `less_equal`, `and`, `or`, `not`
+- `Sort(ctx, arr arrow.Array, order SortOrder) (arrow.Array, error)`
+- `SortIndices(ctx, arr arrow.Array, order SortOrder) (arrow.Array, error)`
+- `TakeWithIndices(ctx, arr, indices arrow.Array) (arrow.Array, error)`
+- `NthElement(ctx, arr arrow.Array, n int64, order SortOrder) (interface{}, error)`
+- `Rank(ctx, arr arrow.Array, order SortOrder) (arrow.Array, error)`
+- `UniqueValues(ctx, arr arrow.Array) (arrow.Array, error)`
+- `CountValues(ctx, arr arrow.Array) (values arrow.Array, counts arrow.Array, err error)`
 
 ### Record Operations
 
-#### Package-Level Functions (Recommended)
+- `FilterRecord(ctx, rec arrow.Record, mask arrow.Array) (arrow.Record, error)`
+- `FilterRecordByColumn(ctx, rec arrow.Record, colName string, condition arrow.Array) (arrow.Record, error)`
+- `FilterRecordByColumnValue(ctx, rec arrow.Record, colName string, value interface{}) (arrow.Record, error)`
+- `FilterRecordByColumnRange(ctx, rec arrow.Record, colName string, min, max interface{}) (arrow.Record, error)`
+- `SortRecord(ctx, rec arrow.Record, sortCols []string, sortOrders []SortOrder) (arrow.Record, error)`
+- `SortRecordByColumn(ctx, rec arrow.Record, colName string, order SortOrder) (arrow.Record, error)`
+- `SumColumn(ctx, rec arrow.Record, colName string) (interface{}, error)`
+- `MeanColumn(ctx, rec arrow.Record, colName string) (float64, error)`
+- `MinColumn(ctx, rec arrow.Record, colName string) (interface{}, error)`
+- `MaxColumn(ctx, rec arrow.Record, colName string) (interface{}, error)`
+- `VarianceColumn(ctx, rec arrow.Record, colName string) (float64, error)`
+- `StandardDeviationColumn(ctx, rec arrow.Record, colName string) (float64, error)`
+- `CountColumn(ctx, rec arrow.Record, colName string) (int64, error)`
 
-- `FilterRecordByMask`, `FilterRecordRows`, `FilterRecordByColumn`: Filter records based on conditions
-- `FilterRecordGreaterThan`, `FilterRecordLessThan`, `FilterRecordEqual`, `FilterRecordBetween`: Filter records with common conditions
-- `SortRecordByColumn`: Sort records by a specified column
-- `AggregateRecordColumn`: Apply aggregation functions to columns
-- `SumRecordColumn`, `MeanRecordColumn`, `MinRecordColumn`, `MaxRecordColumn`: Common aggregation operations
-- `GroupByRecord`: Group records by one or more columns and apply aggregation functions
-- `GetRecordColumn`: Get a column array by name
+### Utility Functions
 
-#### RecordWrapper (Alternative Approach)
+- `ReleaseArray(arr arrow.Array)`
+- `ReleaseRecord(rec arrow.Record)`
+- `GetColumn(rec arrow.Record, name string) (arrow.Array, error)`
+- `GetColumnIndex(rec arrow.Record, name string) (int, error)`
+- `ColumnNames(rec arrow.Record) []string`
+- `ReplaceRecordColumn(rec arrow.Record, colIndex int, newCol arrow.Array) arrow.Record`
+- `ReplaceRecordColumnByName(rec arrow.Record, colName string, newCol arrow.Array) (arrow.Record, error)`
 
-- `RecordWrapper`: A wrapper for Arrow Records that provides methods to apply array operations to records
-- `FilterByMask`, `FilterRows`, `FilterRowsByColumn`: Filter records based on conditions
-- `SortRecord`: Sort records by a specified column
-- `AggregateColumn`: Apply aggregation functions to columns
-- `GroupBy`: Group records by one or more columns and apply aggregation functions
+## Implementation Details
 
-## Usage Examples
+Archery implements many functions that are not available in the core Arrow Go library. These include:
 
-### Working with Arrays
+1. **Aggregation Functions**: Functions like `Sum`, `Mean`, `Min`, `Max`, `Variance`, `StandardDeviation`, etc. are implemented manually to provide functionality that's missing from the Arrow compute module.
 
-```go
-// Create an array
-builder := array.NewFloat64Builder(memory.DefaultAllocator)
-builder.AppendValues([]float64{1.0, 2.0, 3.0, 4.0, 5.0}, nil)
-arr := builder.NewFloat64Array()
-defer arr.Release()
+2. **Sorting Functions**: Functions like `Sort`, `SortIndices`, `UniqueValues`, etc. are implemented manually since the Arrow Go library doesn't provide these compute functions.
 
-// Perform arithmetic operation
-ctx := context.Background()
-result, err := archery.Add(ctx, arr, arr)
-if err != nil {
-    log.Fatal(err)
-}
-defer result.Release()
+3. **Memory Management**: Archery provides careful memory management with functions like `ReleaseArray` and `ReleaseRecord` to prevent memory leaks when working with Arrow data structures.
 
-// Filter array
-filtered, err := archery.FilterGreaterThan(ctx, arr, 3.0)
-if err != nil {
-    log.Fatal(err)
-}
-defer filtered.Release()
+## Examples
 
-// Calculate aggregation
-sum, err := archery.Sum(ctx, arr)
-if err != nil {
-    log.Fatal(err)
-}
-```
+The library includes comprehensive testable examples for all major functionality. You can view these examples in the Go documentation or in the `example_test.go` file.
 
-### Working with Records (Package-Level Functions)
+## Missing Functionality
 
-```go
-// Create a record
-schema := arrow.NewSchema(
-    []arrow.Field{
-        {Name: "id", Type: arrow.PrimitiveTypes.Int64},
-        {Name: "name", Type: arrow.BinaryTypes.String},
-        {Name: "score", Type: arrow.PrimitiveTypes.Float64},
-    },
-    nil,
-)
-
-// Create arrays for the record
-idArray := ... // Int64Array
-nameArray := ... // StringArray
-scoreArray := ... // Float64Array
-
-// Create the record
-record := array.NewRecord(schema, []arrow.Array{idArray, nameArray, scoreArray}, 5)
-defer record.Release()
-
-// Memory allocator
-mem := memory.DefaultAllocator
-
-// Filter records where score > 80
-ctx := context.Background()
-filtered, err := archery.FilterRecordGreaterThan(ctx, record, "score", 80.0, mem)
-if err != nil {
-    log.Fatal(err)
-}
-defer filtered.Release()
-
-// Sort records by score in descending order
-sorted, err := archery.SortRecordByColumn(ctx, record, "score", archery.Descending, mem)
-if err != nil {
-    log.Fatal(err)
-}
-defer sorted.Release()
-
-// Calculate mean score
-mean, err := archery.MeanRecordColumn(ctx, record, "score", mem)
-if err != nil {
-    log.Fatal(err)
-}
-fmt.Printf("Mean score: %.2f\n", mean)
-
-// Group by category and calculate mean scores
-groupByResult, err := archery.GroupByRecord(ctx, record, []string{"category"}, map[string]func(context.Context, arrow.Array) (interface{}, error){
-    "score": archery.MeanAggregator(),
-}, mem)
-if err != nil {
-    log.Fatal(err)
-}
-defer groupByResult.Release()
-
-// Convert the result to a record
-groupedRecord := groupByResult.ToRecord(mem)
-defer groupedRecord.Release()
-```
-
-### Working with Records (RecordWrapper)
-
-```go
-// Create a record
-record := array.NewRecord(schema, []arrow.Array{idArray, nameArray, scoreArray}, 5)
-defer record.Release()
-
-// Create a RecordWrapper
-wrapper := archery.NewRecordWrapper(record, memory.DefaultAllocator)
-
-// Filter records where score > 80
-ctx := context.Background()
-filtered, err := wrapper.FilterRowsByColumn(ctx, "score", archery.GreaterThan(80.0))
-if err != nil {
-    log.Fatal(err)
-}
-defer filtered.Release()
-
-// Sort records by score in descending order
-sorted, err := wrapper.SortRecord(ctx, "score", archery.Descending)
-if err != nil {
-    log.Fatal(err)
-}
-defer sorted.Release()
-
-// Calculate mean score
-mean, err := wrapper.AggregateColumn(ctx, "score", archery.MeanAggregator())
-if err != nil {
-    log.Fatal(err)
-}
-fmt.Printf("Mean score: %.2f\n", mean)
-
-// Group by category and calculate mean scores
-groupByResult, err := wrapper.GroupBy(ctx, []string{"category"}, map[string]func(context.Context, arrow.Array) (interface{}, error){
-    "score": archery.MeanAggregator(),
-})
-if err != nil {
-    log.Fatal(err)
-}
-defer groupByResult.Release()
-
-// Convert the result to a record
-groupedRecord := groupByResult.ToRecord(memory.DefaultAllocator)
-defer groupedRecord.Release()
-```
+For details on functionality that is currently missing from the Arrow Go library and implemented manually in Archery, see the [MISSING_FUNCTIONALITY.md](MISSING_FUNCTIONALITY.md) file.
 
 ## License
 
