@@ -294,7 +294,7 @@ Archery implements many functions that are not available in the core Arrow Go li
 
 ## Examples
 
-The library includes comprehensive testable examples for all major functionality. You can view these examples in the Go documentation or in the `example_test.go` file.
+The library includes comprehensive testable examples for all major functionality.
 
 ## Missing Functionality
 
