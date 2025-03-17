@@ -2,466 +2,284 @@ package archery
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/compute"
-	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/apache/arrow-go/v18/arrow/scalar"
 )
 
-// FilterByMask filters an array using a boolean mask.
-// Returns the filtered array and any error encountered.
-func FilterByMask(ctx context.Context, arr arrow.Array, mask *array.Boolean) (arrow.Array, error) {
-	// The filter function is available in the compute package
-	result, err := compute.CallFunction(ctx, "filter", nil, compute.NewDatum(arr), compute.NewDatum(mask))
+// ARRAY FILTERING OPERATIONS
+
+// Filter returns a new array with only elements where the mask is true
+func Filter(ctx context.Context, input arrow.Array, mask arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "filter", input, mask)
+}
+
+// IsNull returns a mask array indicating which elements are null
+func IsNull(ctx context.Context, input arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "is_null", input)
+}
+
+// IsValid returns a mask array indicating which elements are not null
+func IsValid(ctx context.Context, input arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "is_valid", input)
+}
+
+// Equal returns a mask array indicating which elements are equal
+func Equal(ctx context.Context, a, b arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "equal", a, b)
+}
+
+// NotEqual returns a mask array indicating which elements are not equal
+func NotEqual(ctx context.Context, a, b arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "not_equal", a, b)
+}
+
+// Greater returns a mask array indicating which elements of a are greater than b
+func Greater(ctx context.Context, a, b arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "greater", a, b)
+}
+
+// GreaterEqual returns a mask array indicating which elements of a are greater than or equal to b
+func GreaterEqual(ctx context.Context, a, b arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "greater_equal", a, b)
+}
+
+// Less returns a mask array indicating which elements of a are less than b
+func Less(ctx context.Context, a, b arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "less", a, b)
+}
+
+// LessEqual returns a mask array indicating which elements of a are less than or equal to b
+func LessEqual(ctx context.Context, a, b arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "less_equal", a, b)
+}
+
+// And performs logical AND operation on two boolean arrays
+func And(ctx context.Context, a, b arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "and", a, b)
+}
+
+// Or performs logical OR operation on two boolean arrays
+func Or(ctx context.Context, a, b arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "or", a, b)
+}
+
+// Xor performs logical XOR operation on two boolean arrays
+func Xor(ctx context.Context, a, b arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "xor", a, b)
+}
+
+// Invert performs logical NOT operation on a boolean array
+func Invert(ctx context.Context, input arrow.Array) (arrow.Array, error) {
+	return callFunction(ctx, "invert", input)
+}
+
+// SCALAR COMPARISON OPERATIONS
+
+// EqualScalar returns a mask array indicating which elements are equal to the scalar value
+func EqualScalar(ctx context.Context, input arrow.Array, val interface{}) (arrow.Array, error) {
+	// Convert the scalar value to an Arrow scalar
+	sc, err := toArrowScalar(val, input.DataType())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert scalar: %w", err)
+	}
+
+	// Call the function
+	result, err := compute.CallFunction(ctx, "equal", nil, compute.NewDatum(input), compute.NewDatum(sc))
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare with scalar: %w", err)
 	}
 
 	return result.(*compute.ArrayDatum).MakeArray(), nil
 }
 
-// FilterGreaterThan filters an array to include only elements greater than the specified value.
-// Returns the filtered array and any error encountered.
-func FilterGreaterThan(ctx context.Context, arr arrow.Array, value interface{}) (arrow.Array, error) {
-	// Create a scalar from the value
-	var scalarValue scalar.Scalar
-	var err error
-
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		intValue, ok := value.(int64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewInt64Scalar(intValue)
-	case arrow.FLOAT64:
-		floatValue, ok := value.(float64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewFloat64Scalar(floatValue)
-	case arrow.STRING:
-		strValue, ok := value.(string)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewStringScalar(strValue)
-	default:
-		return nil, arrow.ErrNotImplemented
-	}
-
-	// Use the greater function to create a boolean mask
-	result, err := compute.CallFunction(ctx, "greater", nil, compute.NewDatum(arr), compute.NewDatum(scalarValue))
+// NotEqualScalar returns a mask array indicating which elements are not equal to the scalar value
+func NotEqualScalar(ctx context.Context, input arrow.Array, val interface{}) (arrow.Array, error) {
+	// Convert the scalar value to an Arrow scalar
+	sc, err := toArrowScalar(val, input.DataType())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert scalar: %w", err)
 	}
 
-	// Get the boolean mask
-	mask := result.(*compute.ArrayDatum).MakeArray()
-	defer mask.Release()
+	// Call the function
+	result, err := compute.CallFunction(ctx, "not_equal", nil, compute.NewDatum(input), compute.NewDatum(sc))
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare with scalar: %w", err)
+	}
 
-	// Use the mask to filter the array
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
+	return result.(*compute.ArrayDatum).MakeArray(), nil
 }
 
-// FilterGreaterEqual filters an array to include only elements greater than or equal to the specified value.
-// Returns the filtered array and any error encountered.
-func FilterGreaterEqual(ctx context.Context, arr arrow.Array, value interface{}) (arrow.Array, error) {
-	// Create a scalar from the value
-	var scalarValue scalar.Scalar
-	var err error
-
-	switch v := value.(type) {
-	case int:
-		scalarValue = scalar.NewInt64Scalar(int64(v))
-	case int64:
-		scalarValue = scalar.NewInt64Scalar(v)
-	case float64:
-		scalarValue = scalar.NewFloat64Scalar(v)
-	default:
-		return nil, arrow.ErrInvalid
-	}
-
-	// Create a boolean mask using the greater_equal function
-	maskResult, err := compute.CallFunction(ctx, "greater_equal", nil, compute.NewDatum(arr), compute.NewDatum(scalarValue))
+// GreaterScalar returns a mask array indicating which elements are greater than the scalar value
+func GreaterScalar(ctx context.Context, input arrow.Array, val interface{}) (arrow.Array, error) {
+	// Convert the scalar value to an Arrow scalar
+	sc, err := toArrowScalar(val, input.DataType())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert scalar: %w", err)
 	}
 
-	// Convert the result to a boolean array
-	mask := DatumToArray(maskResult)
-	defer mask.Release()
+	// Call the function
+	result, err := compute.CallFunction(ctx, "greater", nil, compute.NewDatum(input), compute.NewDatum(sc))
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare with scalar: %w", err)
+	}
 
-	// Filter the array using the mask
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
+	return result.(*compute.ArrayDatum).MakeArray(), nil
 }
 
-// FilterLessThan filters an array to include only elements less than the specified value.
-// Returns the filtered array and any error encountered.
-func FilterLessThan(ctx context.Context, arr arrow.Array, value interface{}) (arrow.Array, error) {
-	// Create a scalar from the value
-	var scalarValue scalar.Scalar
-	var err error
-
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		intValue, ok := value.(int64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewInt64Scalar(intValue)
-	case arrow.FLOAT64:
-		floatValue, ok := value.(float64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewFloat64Scalar(floatValue)
-	case arrow.STRING:
-		strValue, ok := value.(string)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewStringScalar(strValue)
-	default:
-		return nil, arrow.ErrNotImplemented
-	}
-
-	// Use the less function to create a boolean mask
-	result, err := compute.CallFunction(ctx, "less", nil, compute.NewDatum(arr), compute.NewDatum(scalarValue))
+// GreaterEqualScalar returns a mask array indicating which elements are greater than or equal to the scalar value
+func GreaterEqualScalar(ctx context.Context, input arrow.Array, val interface{}) (arrow.Array, error) {
+	// Convert the scalar value to an Arrow scalar
+	sc, err := toArrowScalar(val, input.DataType())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert scalar: %w", err)
 	}
 
-	// Get the boolean mask
-	mask := result.(*compute.ArrayDatum).MakeArray()
-	defer mask.Release()
+	// Call the function
+	result, err := compute.CallFunction(ctx, "greater_equal", nil, compute.NewDatum(input), compute.NewDatum(sc))
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare with scalar: %w", err)
+	}
 
-	// Use the mask to filter the array
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
+	return result.(*compute.ArrayDatum).MakeArray(), nil
 }
 
-// FilterLessEqual filters an array to include only elements less than or equal to the specified value.
-// Returns the filtered array and any error encountered.
-func FilterLessEqual(ctx context.Context, arr arrow.Array, value interface{}) (arrow.Array, error) {
-	// Create a scalar from the value
-	var scalarValue scalar.Scalar
-	var err error
-
-	switch v := value.(type) {
-	case int:
-		scalarValue = scalar.NewInt64Scalar(int64(v))
-	case int64:
-		scalarValue = scalar.NewInt64Scalar(v)
-	case float64:
-		scalarValue = scalar.NewFloat64Scalar(v)
-	default:
-		return nil, arrow.ErrInvalid
-	}
-
-	// Create a boolean mask using the less_equal function
-	maskResult, err := compute.CallFunction(ctx, "less_equal", nil, compute.NewDatum(arr), compute.NewDatum(scalarValue))
+// LessScalar returns a mask array indicating which elements are less than the scalar value
+func LessScalar(ctx context.Context, input arrow.Array, val interface{}) (arrow.Array, error) {
+	// Convert the scalar value to an Arrow scalar
+	sc, err := toArrowScalar(val, input.DataType())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert scalar: %w", err)
 	}
 
-	// Convert the result to a boolean array
-	mask := DatumToArray(maskResult)
-	defer mask.Release()
+	// Call the function
+	result, err := compute.CallFunction(ctx, "less", nil, compute.NewDatum(input), compute.NewDatum(sc))
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare with scalar: %w", err)
+	}
 
-	// Filter the array using the mask
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
+	return result.(*compute.ArrayDatum).MakeArray(), nil
 }
 
-// FilterEqual filters an array to include only elements equal to the specified value.
-// Returns the filtered array and any error encountered.
-func FilterEqual(ctx context.Context, arr arrow.Array, value interface{}) (arrow.Array, error) {
-	// Create a scalar from the value
-	var scalarValue scalar.Scalar
-	var err error
-
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		intValue, ok := value.(int64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewInt64Scalar(intValue)
-	case arrow.FLOAT64:
-		floatValue, ok := value.(float64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewFloat64Scalar(floatValue)
-	case arrow.STRING:
-		strValue, ok := value.(string)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewStringScalar(strValue)
-	default:
-		return nil, arrow.ErrNotImplemented
-	}
-
-	// Use the equal function to create a boolean mask
-	result, err := compute.CallFunction(ctx, "equal", nil, compute.NewDatum(arr), compute.NewDatum(scalarValue))
+// LessEqualScalar returns a mask array indicating which elements are less than or equal to the scalar value
+func LessEqualScalar(ctx context.Context, input arrow.Array, val interface{}) (arrow.Array, error) {
+	// Convert the scalar value to an Arrow scalar
+	sc, err := toArrowScalar(val, input.DataType())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert scalar: %w", err)
 	}
 
-	// Get the boolean mask
-	mask := result.(*compute.ArrayDatum).MakeArray()
-	defer mask.Release()
+	// Call the function
+	result, err := compute.CallFunction(ctx, "less_equal", nil, compute.NewDatum(input), compute.NewDatum(sc))
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare with scalar: %w", err)
+	}
 
-	// Use the mask to filter the array
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
+	return result.(*compute.ArrayDatum).MakeArray(), nil
 }
 
-// FilterNotEqual filters an array to include only elements not equal to the specified value.
-// Returns the filtered array and any error encountered.
-func FilterNotEqual(ctx context.Context, arr arrow.Array, value interface{}) (arrow.Array, error) {
-	// Create a scalar from the value
-	var scalarValue scalar.Scalar
-	var err error
+// RECORD OPERATIONS
 
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		intValue, ok := value.(int64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewInt64Scalar(intValue)
-	case arrow.FLOAT64:
-		floatValue, ok := value.(float64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewFloat64Scalar(floatValue)
-	case arrow.STRING:
-		strValue, ok := value.(string)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		scalarValue = scalar.NewStringScalar(strValue)
-	default:
-		return nil, arrow.ErrNotImplemented
+// FilterRecord returns a new record with only rows where the mask is true
+func FilterRecord(ctx context.Context, input arrow.Record, mask arrow.Array) (arrow.Record, error) {
+	// Check mask length
+	if int64(mask.Len()) != input.NumRows() {
+		return nil, fmt.Errorf("mask length (%d) does not match record rows (%d)",
+			mask.Len(), input.NumRows())
 	}
 
-	// Use the not_equal function to create a boolean mask
-	result, err := compute.CallFunction(ctx, "not_equal", nil, compute.NewDatum(arr), compute.NewDatum(scalarValue))
-	if err != nil {
-		return nil, err
+	// Filter each column
+	cols := make([]arrow.Array, input.NumCols())
+	for i := 0; i < int(input.NumCols()); i++ {
+		col := input.Column(i)
+		filtered, err := Filter(ctx, col, mask)
+		if err != nil {
+			// Clean up already created columns
+			for j := 0; j < i; j++ {
+				cols[j].Release()
+			}
+			return nil, fmt.Errorf("error filtering column %d: %w", i, err)
+		}
+		cols[i] = filtered
 	}
 
-	// Get the boolean mask
-	mask := result.(*compute.ArrayDatum).MakeArray()
-	defer mask.Release()
+	// Create new record batch
+	schema := input.Schema()
+	result := array.NewRecord(schema, cols, int64(cols[0].Len()))
 
-	// Use the mask to filter the array
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
+	// Release the columns (record takes ownership)
+	for _, col := range cols {
+		col.Release()
+	}
+
+	return result, nil
 }
 
-// FilterIsMultipleOf filters an array to include only elements that are multiples of the specified value.
-// Returns the filtered array and any error encountered.
-func FilterIsMultipleOf(ctx context.Context, arr arrow.Array, value interface{}) (arrow.Array, error) {
-	// Since modulo is not available, we'll implement this using division and multiplication
-	var scalarValue scalar.Scalar
-
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		intValue, ok := value.(int64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		if intValue == 0 {
-			return nil, arrow.ErrInvalid // Division by zero
-		}
-		scalarValue = scalar.NewInt64Scalar(intValue)
-	case arrow.FLOAT64:
-		floatValue, ok := value.(float64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		if floatValue == 0 {
-			return nil, arrow.ErrInvalid // Division by zero
-		}
-		scalarValue = scalar.NewFloat64Scalar(floatValue)
-	default:
-		return nil, arrow.ErrNotImplemented
-	}
-
-	// Divide the array by the value
-	divResult, err := compute.CallFunction(ctx, "divide", nil, compute.NewDatum(arr), compute.NewDatum(scalarValue))
+// FilterRecordByColumn returns a new record with only rows where the condition on the column is true
+func FilterRecordByColumn(ctx context.Context, input arrow.Record, colName string, condition arrow.Array) (arrow.Record, error) {
+	// Get column by name
+	col, err := GetColumn(input, colName)
 	if err != nil {
 		return nil, err
 	}
+	defer ReleaseArray(col)
 
-	// Floor the result to get the integer division
-	floorResult, err := compute.CallFunction(ctx, "floor", nil, compute.NewDatum(divResult))
-	if err != nil {
-		return nil, err
-	}
-
-	// Multiply by the original value to get multiples
-	multResult, err := compute.CallFunction(ctx, "multiply", nil, compute.NewDatum(floorResult), compute.NewDatum(scalarValue))
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if the result equals the original array
-	equalResult, err := compute.CallFunction(ctx, "equal", nil, compute.NewDatum(arr), compute.NewDatum(multResult))
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the boolean mask
-	mask := equalResult.(*compute.ArrayDatum).MakeArray()
-	defer mask.Release()
-
-	// Use the mask to filter the array
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
+	// Apply filtering to all columns
+	return FilterRecord(ctx, input, condition)
 }
 
-// FilterBetween filters an array to include only elements between the specified lower and upper bounds (inclusive).
-// Returns the filtered array and any error encountered.
-func FilterBetween(ctx context.Context, arr arrow.Array, lower, upper interface{}) (arrow.Array, error) {
-	// Create scalars from the values
-	var lowerScalar, upperScalar scalar.Scalar
-
-	switch arr.DataType().ID() {
-	case arrow.INT64:
-		lowerInt, ok := lower.(int64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		upperInt, ok := upper.(int64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		lowerScalar = scalar.NewInt64Scalar(lowerInt)
-		upperScalar = scalar.NewInt64Scalar(upperInt)
-	case arrow.FLOAT64:
-		lowerFloat, ok := lower.(float64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		upperFloat, ok := upper.(float64)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		lowerScalar = scalar.NewFloat64Scalar(lowerFloat)
-		upperScalar = scalar.NewFloat64Scalar(upperFloat)
-	case arrow.STRING:
-		lowerStr, ok := lower.(string)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		upperStr, ok := upper.(string)
-		if !ok {
-			return nil, arrow.ErrInvalid
-		}
-		lowerScalar = scalar.NewStringScalar(lowerStr)
-		upperScalar = scalar.NewStringScalar(upperStr)
-	default:
-		return nil, arrow.ErrNotImplemented
-	}
-
-	// Use the greater_equal function to create a lower bound mask
-	lowerResult, err := compute.CallFunction(ctx, "greater_equal", nil, compute.NewDatum(arr), compute.NewDatum(lowerScalar))
+// FilterRecordByColumnValue returns a new record with only rows where the column equals the given value
+func FilterRecordByColumnValue(ctx context.Context, input arrow.Record, colName string, val interface{}) (arrow.Record, error) {
+	// Get column by name
+	col, err := GetColumn(input, colName)
 	if err != nil {
 		return nil, err
 	}
+	defer ReleaseArray(col)
 
-	// Use the less_equal function to create an upper bound mask
-	upperResult, err := compute.CallFunction(ctx, "less_equal", nil, compute.NewDatum(arr), compute.NewDatum(upperScalar))
+	// Create mask for filtering
+	mask, err := EqualScalar(ctx, col, val)
 	if err != nil {
 		return nil, err
 	}
+	defer ReleaseArray(mask)
 
-	// Use the and function to combine the masks
-	andResult, err := compute.CallFunction(ctx, "and", nil, compute.NewDatum(lowerResult), compute.NewDatum(upperResult))
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the boolean mask
-	mask := andResult.(*compute.ArrayDatum).MakeArray()
-	defer mask.Release()
-
-	// Use the mask to filter the array
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
+	// Apply filtering
+	return FilterRecord(ctx, input, mask)
 }
 
-// FilterIn filters an array to include only elements that are in the specified values array.
-// Returns the filtered array and any error encountered.
-func FilterIn(ctx context.Context, arr arrow.Array, values arrow.Array) (arrow.Array, error) {
-	// Use the is_in function to create a boolean mask
-	result, err := compute.CallFunction(ctx, "is_in", nil, compute.NewDatum(arr), compute.NewDatum(values))
+// FilterRecordByColumnRange returns a new record with only rows where the column value is in the given range
+func FilterRecordByColumnRange(ctx context.Context, input arrow.Record, colName string, min, max interface{}) (arrow.Record, error) {
+	// Get column by name
+	col, err := GetColumn(input, colName)
 	if err != nil {
 		return nil, err
 	}
+	defer ReleaseArray(col)
 
-	// Get the boolean mask
-	mask := result.(*compute.ArrayDatum).MakeArray()
-	defer mask.Release()
-
-	// Use the mask to filter the array
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
-}
-
-// FilterNotNull filters an array to include only non-null elements.
-// Returns the filtered array and any error encountered.
-func FilterNotNull(ctx context.Context, arr arrow.Array) (arrow.Array, error) {
-	// Use the is_valid function to create a boolean mask
-	result, err := compute.CallFunction(ctx, "is_valid", nil, compute.NewDatum(arr))
+	// Create lower bound mask
+	lowerMask, err := GreaterEqualScalar(ctx, col, min)
 	if err != nil {
 		return nil, err
 	}
+	defer ReleaseArray(lowerMask)
 
-	// Get the boolean mask
-	mask := result.(*compute.ArrayDatum).MakeArray()
-	defer mask.Release()
-
-	// Use the mask to filter the array
-	return FilterByMask(ctx, arr, mask.(*array.Boolean))
-}
-
-// CreateBooleanMask creates a boolean mask from a function that evaluates each element.
-// The function should take an index and return a boolean value.
-// Returns the boolean mask array.
-func CreateBooleanMask(ctx context.Context, arr arrow.Array, fn func(int) bool) *array.Boolean {
-	builder := array.NewBooleanBuilder(memory.DefaultAllocator)
-	defer builder.Release()
-
-	for i := 0; i < arr.Len(); i++ {
-		if arr.IsNull(i) {
-			builder.AppendNull()
-		} else {
-			builder.Append(fn(i))
-		}
-	}
-
-	return builder.NewBooleanArray()
-}
-
-// Take selects elements from an array based on the provided indices.
-// Returns the resulting array and any error encountered.
-func Take(ctx context.Context, arr arrow.Array, indices arrow.Array) (arrow.Array, error) {
-	opts := compute.TakeOptions{BoundsCheck: true}
-	result, err := compute.Take(ctx, opts, compute.NewDatum(arr), compute.NewDatum(indices))
+	// Create upper bound mask
+	upperMask, err := LessEqualScalar(ctx, col, max)
 	if err != nil {
 		return nil, err
 	}
-	return DatumToArray(result), nil
-}
+	defer ReleaseArray(upperMask)
 
-// Unique returns the unique values in an array.
-// Returns the resulting array and any error encountered.
-func Unique(ctx context.Context, arr arrow.Array) (arrow.Array, error) {
-	result, err := compute.CallFunction(ctx, "unique", nil, compute.NewDatum(arr))
+	// Combine masks
+	combinedMask, err := And(ctx, lowerMask, upperMask)
 	if err != nil {
 		return nil, err
 	}
-	return DatumToArray(result), nil
+	defer ReleaseArray(combinedMask)
+
+	// Apply filtering
+	return FilterRecord(ctx, input, combinedMask)
 }
