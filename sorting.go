@@ -7,6 +7,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/compute"
 	"github.com/apache/arrow-go/v18/arrow/memory"
 )
 
@@ -179,7 +180,13 @@ func SortIndices(ctx context.Context, input arrow.Array, order SortOrder) (arrow
 
 // TakeWithIndices reorders elements of the array according to the indices
 func TakeWithIndices(ctx context.Context, input arrow.Array, indices arrow.Array) (arrow.Array, error) {
-	// Implement take manually
+	result, err := compute.TakeArray(ctx, input, indices)
+	if err == nil {
+		// compute-upgraded
+		return result, nil
+	}
+	// compute.take not available or failed – fallback
+	// TODO(archery): replace with compute.take when supported
 	indicesArr, ok := indices.(*array.Int64)
 	if !ok {
 		return nil, fmt.Errorf("indices must be an Int64Array")
@@ -347,6 +354,13 @@ func Rank(ctx context.Context, input arrow.Array, order SortOrder) (arrow.Array,
 
 // UniqueValues returns the unique values in the array
 func UniqueValues(ctx context.Context, input arrow.Array) (arrow.Array, error) {
+	result, err := compute.UniqueArray(ctx, input)
+	if err == nil {
+		// compute-upgraded
+		return result, nil
+	}
+	// compute.unique not available or failed – fallback
+	// TODO(archery): replace with compute.unique when supported
 	// Implement unique manually
 	switch input.DataType().ID() {
 	case arrow.BOOL:
