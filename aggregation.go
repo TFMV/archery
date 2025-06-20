@@ -7,152 +7,57 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/compute"
+	"github.com/apache/arrow-go/v18/arrow/scalar"
 )
 
 // ARRAY AGGREGATION OPERATIONS
 
 // Sum returns the sum of all elements in the array
 func Sum(ctx context.Context, input arrow.Array) (interface{}, error) {
-	// Implement sum manually since the compute function is not available
-	switch input.DataType().ID() {
-	case arrow.BOOL:
-		boolArr := input.(*array.Boolean)
-		var sum int64
-		for i := 0; i < boolArr.Len(); i++ {
-			if !boolArr.IsNull(i) {
-				if boolArr.Value(i) {
-					sum++
-				}
+	result, err := compute.CallFunction(ctx, "sum", nil, compute.NewDatum(input))
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute sum: %w", err)
+	}
+
+	sc := result.(*compute.ScalarDatum).Value
+	switch v := sc.(type) {
+	case *scalar.Int64:
+		return v.Value, nil
+	case *scalar.Uint64:
+		return v.Value, nil
+	case *scalar.Float64:
+		return v.Value, nil
+	case *scalar.Boolean:
+		if v.Valid {
+			if v.Value {
+				return int64(1), nil
 			}
+			return int64(0), nil
 		}
-		return sum, nil
-	case arrow.INT8:
-		int8Arr := input.(*array.Int8)
-		var sum int64
-		for i := 0; i < int8Arr.Len(); i++ {
-			if !int8Arr.IsNull(i) {
-				sum += int64(int8Arr.Value(i))
-			}
-		}
-		return sum, nil
-	case arrow.INT16:
-		int16Arr := input.(*array.Int16)
-		var sum int64
-		for i := 0; i < int16Arr.Len(); i++ {
-			if !int16Arr.IsNull(i) {
-				sum += int64(int16Arr.Value(i))
-			}
-		}
-		return sum, nil
-	case arrow.INT32:
-		int32Arr := input.(*array.Int32)
-		var sum int64
-		for i := 0; i < int32Arr.Len(); i++ {
-			if !int32Arr.IsNull(i) {
-				sum += int64(int32Arr.Value(i))
-			}
-		}
-		return sum, nil
-	case arrow.INT64:
-		int64Arr := input.(*array.Int64)
-		var sum int64
-		for i := 0; i < int64Arr.Len(); i++ {
-			if !int64Arr.IsNull(i) {
-				sum += int64Arr.Value(i)
-			}
-		}
-		return sum, nil
-	case arrow.UINT8:
-		uint8Arr := input.(*array.Uint8)
-		var sum uint64
-		for i := 0; i < uint8Arr.Len(); i++ {
-			if !uint8Arr.IsNull(i) {
-				sum += uint64(uint8Arr.Value(i))
-			}
-		}
-		return sum, nil
-	case arrow.UINT16:
-		uint16Arr := input.(*array.Uint16)
-		var sum uint64
-		for i := 0; i < uint16Arr.Len(); i++ {
-			if !uint16Arr.IsNull(i) {
-				sum += uint64(uint16Arr.Value(i))
-			}
-		}
-		return sum, nil
-	case arrow.UINT32:
-		uint32Arr := input.(*array.Uint32)
-		var sum uint64
-		for i := 0; i < uint32Arr.Len(); i++ {
-			if !uint32Arr.IsNull(i) {
-				sum += uint64(uint32Arr.Value(i))
-			}
-		}
-		return sum, nil
-	case arrow.UINT64:
-		uint64Arr := input.(*array.Uint64)
-		var sum uint64
-		for i := 0; i < uint64Arr.Len(); i++ {
-			if !uint64Arr.IsNull(i) {
-				sum += uint64Arr.Value(i)
-			}
-		}
-		return sum, nil
-	case arrow.FLOAT32:
-		float32Arr := input.(*array.Float32)
-		var sum float64
-		for i := 0; i < float32Arr.Len(); i++ {
-			if !float32Arr.IsNull(i) {
-				sum += float64(float32Arr.Value(i))
-			}
-		}
-		return sum, nil
-	case arrow.FLOAT64:
-		float64Arr := input.(*array.Float64)
-		var sum float64
-		for i := 0; i < float64Arr.Len(); i++ {
-			if !float64Arr.IsNull(i) {
-				sum += float64Arr.Value(i)
-			}
-		}
-		return sum, nil
+		return nil, nil
 	default:
-		return nil, fmt.Errorf("sum not implemented for type %s", input.DataType())
+		return nil, fmt.Errorf("unsupported sum result type %T", sc)
 	}
 }
 
 // Mean returns the mean of all elements in the array
 func Mean(ctx context.Context, input arrow.Array) (float64, error) {
-	// Implement mean manually
 	if input.Len() == 0 || input.Len() == input.NullN() {
 		return 0, nil
 	}
 
-	switch input.DataType().ID() {
-	case arrow.BOOL, arrow.INT8, arrow.INT16, arrow.INT32, arrow.INT64,
-		arrow.UINT8, arrow.UINT16, arrow.UINT32, arrow.UINT64,
-		arrow.FLOAT32, arrow.FLOAT64:
-
-		sum, err := Sum(ctx, input)
-		if err != nil {
-			return 0, err
-		}
-
-		count := float64(input.Len() - input.NullN())
-
-		switch v := sum.(type) {
-		case int64:
-			return float64(v) / count, nil
-		case uint64:
-			return float64(v) / count, nil
-		case float64:
-			return v / count, nil
-		default:
-			return 0, fmt.Errorf("unexpected sum type: %T", sum)
-		}
-	default:
-		return 0, fmt.Errorf("mean not implemented for type %s", input.DataType())
+	result, err := compute.CallFunction(ctx, "mean", nil, compute.NewDatum(input))
+	if err != nil {
+		return 0, fmt.Errorf("failed to compute mean: %w", err)
 	}
+
+	sc := result.(*compute.ScalarDatum).Value
+	if v, ok := sc.(*scalar.Float64); ok {
+		return v.Value, nil
+	}
+
+	return 0, fmt.Errorf("unexpected mean result type %T", sc)
 }
 
 // Min returns the minimum value in the array
@@ -615,12 +520,27 @@ func StandardDeviation(ctx context.Context, input arrow.Array) (float64, error) 
 
 // Count returns the number of non-null elements in the array
 func Count(ctx context.Context, input arrow.Array) (int64, error) {
-	// This is simply the length minus the null count
-	return int64(input.Len() - input.NullN()), nil
+	result, err := compute.CallFunction(ctx, "count", nil, compute.NewDatum(input))
+	if err != nil {
+		return 0, fmt.Errorf("failed to compute count: %w", err)
+	}
+	sc := result.(*compute.ScalarDatum).Value
+	if v, ok := sc.(*scalar.Int64); ok {
+		return v.Value, nil
+	}
+	return 0, fmt.Errorf("unexpected count result type %T", sc)
 }
 
 // CountNull returns the number of null elements in the array
 func CountNull(ctx context.Context, input arrow.Array) int64 {
+	result, err := compute.CallFunction(ctx, "count_null", nil, compute.NewDatum(input))
+	if err != nil {
+		return int64(input.NullN())
+	}
+	sc := result.(*compute.ScalarDatum).Value
+	if v, ok := sc.(*scalar.Int64); ok {
+		return v.Value
+	}
 	return int64(input.NullN())
 }
 
@@ -630,13 +550,15 @@ func Any(ctx context.Context, input arrow.Array) (bool, error) {
 		return false, fmt.Errorf("any operation only supported on boolean arrays")
 	}
 
-	boolArr := input.(*array.Boolean)
-	for i := 0; i < boolArr.Len(); i++ {
-		if !boolArr.IsNull(i) && boolArr.Value(i) {
-			return true, nil
-		}
+	result, err := compute.CallFunction(ctx, "any", nil, compute.NewDatum(input))
+	if err != nil {
+		return false, fmt.Errorf("failed to compute any: %w", err)
 	}
-	return false, nil
+	sc := result.(*compute.ScalarDatum).Value
+	if v, ok := sc.(*scalar.Boolean); ok {
+		return v.Value, nil
+	}
+	return false, fmt.Errorf("unexpected any result type %T", sc)
 }
 
 // All returns true if all elements in the boolean array are true
@@ -645,13 +567,15 @@ func All(ctx context.Context, input arrow.Array) (bool, error) {
 		return false, fmt.Errorf("all operation only supported on boolean arrays")
 	}
 
-	boolArr := input.(*array.Boolean)
-	for i := 0; i < boolArr.Len(); i++ {
-		if !boolArr.IsNull(i) && !boolArr.Value(i) {
-			return false, nil
-		}
+	result, err := compute.CallFunction(ctx, "all", nil, compute.NewDatum(input))
+	if err != nil {
+		return false, fmt.Errorf("failed to compute all: %w", err)
 	}
-	return true, nil
+	sc := result.(*compute.ScalarDatum).Value
+	if v, ok := sc.(*scalar.Boolean); ok {
+		return v.Value, nil
+	}
+	return false, fmt.Errorf("unexpected all result type %T", sc)
 }
 
 // RECORD OPERATIONS

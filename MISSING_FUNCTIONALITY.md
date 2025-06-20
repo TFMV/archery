@@ -1,24 +1,24 @@
 # Missing Functionality in arrow-go/v18
 
-This document outlines functionality that is currently missing from the Apache Arrow Go implementation (arrow-go/v18) that would be beneficial to add to the core library. The Archery library has implemented these functions manually, but they would be better suited as part of the core Arrow compute functionality.
+This document outlines functionality that was missing from the Apache Arrow Go implementation (arrow-go/v18). Recent releases have added many of these capabilities and Archery now delegates to the Arrow compute module whenever possible.
 
 ## Compute Functions
 
 ### Aggregation Functions
 
-The following aggregation functions are missing from the Arrow compute module:
+The following aggregation functions were previously unavailable but are now provided by Arrow compute and used by Archery:
 
-- `sum`: Calculate the sum of elements in an array
-- `mean`: Calculate the mean of elements in an array
-- `min`: Find the minimum value in an array
-- `max`: Find the maximum value in an array
-- `mode`: Find the most common value in an array
-- `variance`: Calculate the variance of elements in an array
-- `standard_deviation`: Calculate the standard deviation of elements in an array
-- `count`: Count non-null elements in an array
-- `count_null`: Count null elements in an array
-- `any`: Check if any element in a boolean array is true
-- `all`: Check if all elements in a boolean array are true
+- `sum`
+- `mean`
+- `min`
+- `max`
+- `variance`
+- `standard_deviation`
+- `count`
+- `count_null`
+- `any`
+- `all`
+- `mode` (still missing)
 
 ### Sorting Functions
 

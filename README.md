@@ -284,9 +284,9 @@ func main() {
 
 ## Implementation Details
 
-Archery implements many functions that are not available in the core Arrow Go library. These include:
+Archery implements convenient wrappers around Arrow compute. These include:
 
-1. **Aggregation Functions**: Functions like `Sum`, `Mean`, `Min`, `Max`, `Variance`, `StandardDeviation`, etc. are implemented manually to provide functionality that's missing from the Arrow compute module.
+1. **Aggregation Functions**: Operations such as `Sum`, `Mean`, `Min`, `Max`, `Variance`, and `StandardDeviation` leverage the Arrow compute module to provide efficient array-wide calculations.
 
 2. **Sorting Functions**: Functions like `Sort`, `SortIndices`, `UniqueValues`, etc. are implemented manually since the Arrow Go library doesn't provide these compute functions.
 
