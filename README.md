@@ -293,6 +293,13 @@ Archery implements many functions that are not available in the core Arrow Go li
 
 3. **Memory Management**: Archery provides careful memory management with functions like `ReleaseArray` and `ReleaseRecord` to prevent memory leaks when working with Arrow data structures.
 
+## Compute Coverage
+
+| Function | Status |
+|----------|--------|
+| `unique` | uses compute when available |
+| `take`   | uses compute when available |
+
 ## Examples
 
 The library includes comprehensive testable examples for all major functionality.
