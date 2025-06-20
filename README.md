@@ -13,6 +13,7 @@ It simplifies common tasks by providing direct functions that operate on Arrow a
   - Filtering and comparison operations
   - Aggregation functions (sum, mean, min, max, etc.)
   - Sorting operations
+  - Anomaly detection using z-scores
 
 ## Installation
 
