@@ -1,6 +1,7 @@
 module github.com/TFMV/archery
 
-go 1.24.0
+go 1.26.0
+toolchain go1.26.0
 
 require github.com/apache/arrow-go/v18 v18.3.0
 
