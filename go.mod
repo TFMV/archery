@@ -1,13 +1,12 @@
 module github.com/TFMV/archery
 
 go 1.26.0
-toolchain go1.26.0
 
 require github.com/apache/arrow-go/v18 v18.3.0
 
 require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
-	github.com/apache/thrift v0.22.0 // indirect
+	github.com/apache/thrift v0.23.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
